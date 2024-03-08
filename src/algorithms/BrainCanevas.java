@@ -13,7 +13,7 @@ public class BrainCanevas extends Brain {
     private double endTaskDirection, lastSeenDirection, lastShot;
     private int endTaskCounter, berzerkInertia;
     private boolean firstMove, berzerkTurning;
-    private static final double PRECISION = 0.001;
+    private static final double PRECISION = 0.01;
 
     public BrainCanevas() {
         super();

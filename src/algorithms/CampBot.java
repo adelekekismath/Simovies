@@ -20,7 +20,7 @@ public class CampBot extends Brain {
   public CampBot() { super(); }
 
   public void activate() {
-    turnTask=true;
+    turnTask=true; 
     finished=false;
     taskOne=true;
     endTaskDirection=getHeading()+0.4*Math.PI;

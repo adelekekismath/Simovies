@@ -1,124 +1,299 @@
+/* ******************************************************
+* Simovies - Eurobot 2015 Robomovies Simulator.
+* Copyright (C) 2014 <Binh-Minh.Bui-Xuan@ens-lyon.org>.
+* GPL version>=3 <http://www.gnu.org/licenses/>.
+* $Id: algorithms/Stage1.java 2014-10-18 buixuan.
+* ******************************************************/
 package characteristics;
 
 import robotsimulator.Brain;
+import characteristics.Parameters;
 import characteristics.IFrontSensorResult;
 import characteristics.IRadarResult;
 
 import java.util.ArrayList;
 
-public class MainBot  extends Brain{
-    
-    private static final int INITSTATE = 1;
-    private static final int MOVEESTATE = 2;
-    private static final int FIRESTATE = 3;
-    private static final int TURNLEFTSTATE = 4;
-    private static final int TURNRIGHTSTATE = 5;
-    private static final int OPPONENTDETECTEDSTATE = 6;
-    private static final int OPPONENTTURNEDSTATE = 7;
+public class MainBot extends Brain {
+    // ---PARAMETERS---//
+    private static final double ANGLEPRECISION = 0.01;
+    private static final double FIREANGLEPRECISION = Math.PI / (double) 6;
 
+    private static final int ALPHA = 0x1EADDA;
+    private static final int BETA = 0x5EC0;
+    private static final int GAMMA = 0x333;
+    private static final int TEAM = 0xBADDAD;
+    private static final int UNDEFINED = 0xBADC0DE0;
 
-    // VARIABLES
+    private static final int FIRE = 0xB52;
+    private static final int FALLBACK = 0xFA11BAC;
+    private static final int ROGER = 0x0C0C0C0C;
+    private static final int OVER = 0xC00010FF;
+
+    private static final int TURNSOUTHTASK = 1;
+    private static final int MOVETASK = 2;
+    private static final int TURNLEFTTASK = 3;
+    private static final int SINK = 0xBADC0DE1;
+    private static final int TURNWHENSEENENNEMY = 0xBADC0DE2;
+    private boolean isTurning180Degrees = false;
+    private double targetHeading;
+
+    // ---VARIABLES---//
     private int state;
+    private double oldAngle;
     private double myX, myY;
     private boolean isMoving;
-    private double backAngle;
-    private double endDirection;
-    private double lastDirection;
-    private double endCounter;
-    private int id;
-    private static int idConter = 0;
+    private int whoAmI;
+    private int fireRythm, rythm, counter;
+    private int countDown;
+    private double targetX, targetY;
+    private boolean fireOrder;
+    private boolean freeze;
+    private boolean friendlyFire;
 
-
+    // ---CONSTRUCTORS---//
     public MainBot() {
         super();
-        id = idConter;
-        idConter++;
     }
 
+    // ---ABSTRACT-METHODS-IMPLEMENTATION---//
     public void activate() {
-        state = INITSTATE;
+        // ODOMETRY CODE
+        whoAmI = GAMMA;
+        for (IRadarResult o : detectRadar())
+            if (isSameDirection(o.getObjectDirection(), Parameters.NORTH))
+                whoAmI = ALPHA;
+        for (IRadarResult o : detectRadar())
+            if (isSameDirection(o.getObjectDirection(), Parameters.SOUTH) && whoAmI != GAMMA)
+                whoAmI = BETA;
+        if (whoAmI == GAMMA) {
+            myX = Parameters.teamAMainBot1InitX;
+            myY = Parameters.teamAMainBot1InitY;
+        } else {
+            myX = Parameters.teamAMainBot2InitX;
+            myY = Parameters.teamAMainBot2InitY;
+        }
+        if (whoAmI == ALPHA) {
+            myX = Parameters.teamAMainBot3InitX;
+            myY = Parameters.teamAMainBot3InitY;
+        }
+
+        // INIT
+        state = MOVETASK;
+        isMoving = false;
+        fireOrder = false;
+        fireRythm = 0;
+        oldAngle = myGetHeading();
+        targetX = 1500;
+        targetY = 1000;
     }
 
     public void step() {
+        // ODOMETRY CODE
+        if (isMoving) {
+            myX += Parameters.teamAMainBotSpeed * Math.cos(myGetHeading());
+            myY += Parameters.teamAMainBotSpeed * Math.sin(myGetHeading());
+            isMoving = false;
+        }
+        // DEBUG MESSAGE
+        boolean debug = true;
+        if (debug && whoAmI == ALPHA && state != SINK) {
+            sendLogMessage("#ALPHA *thinks* (x,y)= (" + (int) myX + ", " + (int) myY + ") theta= "
+                    + (int) (myGetHeading() * 180 / (double) Math.PI) + "Â°. #State= " + state);
+        }
+        if (debug && whoAmI == BETA && state != SINK) {
+            sendLogMessage("#BETA *thinks* (x,y)= (" + (int) myX + ", " + (int) myY + ") theta= "
+                    + (int) (myGetHeading() * 180 / (double) Math.PI) + "Â°. #State= " + state);
+        }
+        if (debug && whoAmI == GAMMA && state != SINK) {
+            sendLogMessage("#GAMMA *thinks* (x,y)= (" + (int) myX + ", " + (int) myY + ") theta= "
+                    + (int) (myGetHeading() * 180 / (double) Math.PI) + "Â°. #State= " + state);
+        }
+        if (debug && fireOrder)
+            sendLogMessage("Firing enemy!!");
 
-        // switch (state) {
-        //     case INITSTATE:
-        //         System.out.println("INITSTATE");
-        //         move();
-        //         state = MOVEESTATE;
-        //         break;
-        //     case MOVEESTATE:
-        //         if (id == 0) {
-        //             OldAngle_0 = 0;
-        //             FrontSensorResult radarResult = detectFront();
-        //             if (radarResult.getObjectType() == IFrontSensorResult.Types.OpponentMainBot
-        //                     || radarResult.getObjectType() == IFrontSensorResult.Types.OpponentSecondaryBot) {
-        //                 System.out.println("MoveEstate: Opponent detected");
-        //                 state = FIRESTATE;
-        //                 return;
-        //             }
-        //             else if (radarResult.getObjectType() == IFrontSensorResult.Types.WALL) {
-        //                 System.out.println("MoveEstate: WALL detected");
-        //                 state = TURNLEFTSTATE;
-        //                 return;
-        //             }
-        //             else {
-        //                 move();
-        //                 System.out.println("MoveEstate: No opponent detected");
-        //                 return;
-        //             }
-        //         }
-        //         break;
-        //     case TURNLEFTSTATE:
-        //         if (id == 0) {
-        //             if (isHeading(turn90) && turnAngle_0 == 90) {
-        //                 System.out.println("TurnLeftState: Heading 90");
-        //                 state = MOVEESTATE;
-        //                 turnAngle_0 = 0;
-        //                 return;
-        //             }
-        //             if(isHeading(0) && turnAngle_0 == 0){
-        //                 System.out.println("TurnLeftState: Heading 0");
-        //                 turnAngle_0 = 90;
-        //                 state = MOVEESTATE;
-        //                 return;
-        //             }
-        //             else {
-        //                 System.out.println("TurnLeftState: Heading not 90");
-        //                 stepTurn(Parameters.Direction.LEFT);
-        //                 return;
-        //             }
-        //         }
-        //         break;
-        //     case FIRESTATE:
-        //         if (id == 0) {
-        //             IFrontSensorResult radarResult = detectFront();
-        //             if (radarResult.getObjectType() == IFrontSensorResult.Types.Wreck) {
-        //                 System.out.println("FireState: Wreck detected");
-        //                 state = TURNLEFTSTATE;
-        //                 return;
-        //             }
-        //             else if (radarResult.getObjectType() == IFrontSensorResult.Types.NOTHING) {
-        //                 System.out.println("FireState: No wreck detected");
-        //                 state = MOVEESTATE;
-        //                 return;
-        //             }
-        //             else {
-        //                 System.out.println("FireState: No wreck detected");
-        //                 fire(getHeading());
-        //                 return;
-        //             }
-        //         }
-        //         break;
+        // COMMUNICATION
+        ArrayList<String> messages = fetchAllMessages();
+        for (String m : messages)
+            if (Integer.parseInt(m.split(":")[1]) == whoAmI || Integer.parseInt(m.split(":")[1]) == TEAM)
+            {
+                process(m);
+                state = TURNWHENSEENENNEMY;
+            }
+                
 
-        //     default:
-        //         break;
-        // }
+        // RADAR DETECTION
+        freeze = false;
+        friendlyFire = true;
+        for (IRadarResult o : detectRadar()) {
+            if (o.getObjectType() == IRadarResult.Types.OpponentMainBot
+                    || o.getObjectType() == IRadarResult.Types.OpponentSecondaryBot) {
+                double enemyX = myX + o.getObjectDistance() * Math.cos(o.getObjectDirection());
+                double enemyY = myY + o.getObjectDistance() * Math.sin(o.getObjectDirection());
+                broadcast(whoAmI + ":" + TEAM + ":" + FIRE + ":" + enemyX + ":" + enemyY + ":" + OVER);
+                turn180DegreesRight();
+                state = TURNWHENSEENENNEMY;
+                isTurning180Degrees = false;
+            }
+            if (o.getObjectDistance() <= 100 && !isRoughlySameDirection(o.getObjectDirection(), getHeading())
+                    && o.getObjectType() != IRadarResult.Types.BULLET) {
+                freeze = true;
+            }
+            if (o.getObjectType() == IRadarResult.Types.TeamMainBot
+                    || o.getObjectType() == IRadarResult.Types.TeamSecondaryBot
+                    || o.getObjectType() == IRadarResult.Types.Wreck) {
+                if (fireOrder && onTheWay(o.getObjectDirection())) {
+                    friendlyFire = false;
+                }
+            }
+        }
+        if (freeze)
+            return;
 
+        // AUTOMATON
+        if (fireOrder)
+            countDown++;
+        if (countDown >= 100)
+            fireOrder = false;
+        if (fireOrder && fireRythm == 0 && friendlyFire) {
+            firePosition(targetX, targetY);
+            fireRythm++;
+            return;
+        }
+        fireRythm++;
+        if (fireRythm >= Parameters.bulletFiringLatency)
+            fireRythm = 0;
+        if (state == TURNSOUTHTASK && !(isSameDirection(getHeading(), Parameters.SOUTH))) {
+            stepTurn(Parameters.Direction.RIGHT);
+            return;
+        }
+        if (state == TURNSOUTHTASK && isSameDirection(getHeading(), Parameters.SOUTH)) {
+            state = MOVETASK;
+            myMove();
+            return;
+        }
+        if (state == MOVETASK && detectFront().getObjectType() != IFrontSensorResult.Types.WALL) {
+            System.out.println("I am moving");
+            myMove();
+            return;
+        }
+        if (state == MOVETASK && detectFront().getObjectType() == IFrontSensorResult.Types.WALL) {
+            state = TURNLEFTTASK;
+            oldAngle = myGetHeading();
+            stepTurn(Parameters.Direction.LEFT);
+            return;
+        }
+        if (state == TURNLEFTTASK && !(isSameDirection(getHeading(), oldAngle + Parameters.LEFTTURNFULLANGLE))) {
+            stepTurn(Parameters.Direction.LEFT);
+            return;
+        }
+        if (state == TURNLEFTTASK && isSameDirection(getHeading(), oldAngle + Parameters.LEFTTURNFULLANGLE)) {
+            state = MOVETASK;
+            myMove();
+            return;
+        }
+
+        if (state == 0xB52) {
+            if (fireRythm == 0) {
+                firePosition(700, 1500);
+                fireRythm++;
+                return;
+            }
+            fireRythm++;
+            if (fireRythm == Parameters.bulletFiringLatency)
+                fireRythm = 0;
+            if (rythm == 0)
+                stepTurn(Parameters.Direction.LEFT);
+            else
+                myMove();
+            rythm++;
+            if (rythm == 14)
+                rythm = 0;
+            return;
+        }
+
+        if (state == SINK) {
+            myMove();
+            return;
+        }
+        if (state == TURNWHENSEENENNEMY && !hasReachedTargetHeading()) {
+            stepTurn(Parameters.Direction.LEFT);
+            return;
+        }
+        else if (state == TURNWHENSEENENNEMY && hasReachedTargetHeading()) {
+            isTurning180Degrees = false;
+            state = MOVETASK;
+            return;
+        }
+        if (true) {
+            return;
+        }
     }
 
-    private boolean isHeading(double dir) {
-        double heading = Math.abs(getHeading() % (2 * Math.PI));
-        return Math.abs(Math.sin(heading-dir))< 0.01;
+    private void myMove() {
+        isMoving = true;
+        move();
     }
+
+    private double myGetHeading() {
+        return normalizeRadian(getHeading());
+    }
+
+    private double normalizeRadian(double angle) {
+        double result = angle;
+        while (result < 0)
+            result += 2 * Math.PI;
+        while (result >= 2 * Math.PI)
+            result -= 2 * Math.PI;
+        return result;
+    }
+
+    private boolean isSameDirection(double dir1, double dir2) {
+        return Math.abs(normalizeRadian(dir1) - normalizeRadian(dir2)) < ANGLEPRECISION;
+    }
+
+    private boolean isRoughlySameDirection(double dir1, double dir2) {
+        return Math.abs(normalizeRadian(dir1) - normalizeRadian(dir2)) < FIREANGLEPRECISION;
+    }
+
+    private void process(String message) {
+        if (Integer.parseInt(message.split(":")[2]) == FIRE) {
+            fireOrder = true;
+            countDown = 0;
+            targetX = Double.parseDouble(message.split(":")[3]);
+            targetY = Double.parseDouble(message.split(":")[4]);
+        }
+    }
+
+    private void firePosition(double x, double y) {
+        if (myX <= x)
+            fire(Math.atan((y - myY) / (double) (x - myX)));
+        else
+            fire(Math.PI + Math.atan((y - myY) / (double) (x - myX)));
+        return;
+    }
+
+    private boolean onTheWay(double angle) {
+        if (myX <= targetX)
+            return isRoughlySameDirection(angle, Math.atan((targetY - myY) / (double) (targetX - myX)));
+        else
+            return isRoughlySameDirection(angle, Math.PI + Math.atan((targetY - myY) / (double) (targetX - myX)));
+    }
+
+    private void turn180DegreesRight() {
+        double currentHeading = getHeading();
+        targetHeading = Math.toRadians((Math.toDegrees(currentHeading) + 180) % 360);
+        isTurning180Degrees = true;
+        stepTurn(Parameters.Direction.RIGHT);
+    }
+
+    private boolean hasReachedTargetHeading() {
+        double currentHeading = getHeading();
+        // Calcule la différence d'angle en tenant compte de la circularité
+        double angleDifference = Math.abs(currentHeading - targetHeading);
+        if (angleDifference > Math.PI) {
+            angleDifference = 2 * Math.PI - angleDifference;
+        }
+        return angleDifference < ANGLEPRECISION;
+    }
+
 }
