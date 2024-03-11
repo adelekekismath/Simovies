@@ -23,25 +23,29 @@ public class Parameters {
   //-----------------------//
   public static final String teamAName = "KD Runners";
   public static final String teamAMainBotBrainClassName = "terminator.MainBotBrain"; //class given by name; is supposed to extends robotsimulator.Brain
-  public static final String teamAMainBotAvatar = "avatars/cyclope.png"; //path relative to location of ant build.xml file
-  public static final double teamAMainBotRadius = 50, //1 unit = 1mm, body radius
-                             teamAMainBotFrontalDetectionRange = 300, //1 unit = 1mm, range of frontal sensor
-                             teamAMainBotFrontalDetectionAngle = 0, //UNUSED AT THE MOMENT, frontal sensor detection angle is suppoed to be absolute
-                             teamAMainBotSpeed = 1, //1 unit = 1mm, distance performed at step movement
-                             teamAMainBotStepTurnAngle = 0.01*Math.PI, //trigonometric unit, angle performed at step turn action
-                             teamAMainBotHealth = 300, //FICTIONAL SIMOVIES
-                             teamAMainBot1InitX = 0, //1 unit = 1mm, coordinate of central point
-                             teamAMainBot1InitY = 0, //1 unit = 1mm, coordinate of central point
-                             teamAMainBot1InitHeading = EAST, //clockwise trigonometric unit, according to screen pixel coordinate reference
-                             teamAMainBot2InitX = 0, //1 unit = 1mm, coordinate of central point
-                             teamAMainBot2InitY = 0, //1 unit = 1mm, coordinate of central point
-                             teamAMainBot2InitHeading = EAST, //clockwise trigonometric unit, according to screen pixel coordinate reference
-                             teamAMainBot3InitX = 200, //1 unit = 1mm, coordinate of central point
-                             teamAMainBot3InitY = 1200, //1 unit = 1mm, coordinate of central point
-                             teamAMainBot3InitHeading = EAST; //clockwise trigonometric unit, according to screen pixel coordinate reference
+  public static final String teamAMainBotAvatar = "avatars/batman.png"; //path relative to location of ant build.xml file
+  public static final double teamAMainBotRadius = 50, // 1 unit = 1mm, body radius
+          teamAMainBotFrontalDetectionRange = 300, // 1 unit = 1mm, range of frontal sensor
+          teamAMainBotFrontalDetectionAngle = 0, // UNUSED AT THE MOMENT, frontal sensor detection angle is suppoed to
+                                                 // be absolute
+          teamAMainBotSpeed = 1, // 1 unit = 1mm, distance performed at step movement
+          teamAMainBotStepTurnAngle = 0.01 * Math.PI, // trigonometric unit, angle performed at step turn action
+          teamAMainBotHealth = 300, // FICTIONAL SIMOVIES
+          teamAMainBot1InitX = 200, // 1 unit = 1mm, coordinate of central point
+          teamAMainBot1InitY = 800, // 1 unit = 1mm, coordinate of central point
+          teamAMainBot1InitHeading = EAST, // clockwise trigonometric unit, according to screen pixel coordinate
+                                           // reference
+          teamAMainBot2InitX = 200, // 1 unit = 1mm, coordinate of central point
+          teamAMainBot2InitY = 1000, // 1 unit = 1mm, coordinate of central point
+          teamAMainBot2InitHeading = EAST, // clockwise trigonometric unit, according to screen pixel coordinate
+                                           // reference
+          teamAMainBot3InitX = 200, // 1 unit = 1mm, coordinate of central point
+          teamAMainBot3InitY = 1200, // 1 unit = 1mm, coordinate of central point
+          teamAMainBot3InitHeading = EAST; // clockwise trigonometric unit, according to screen pixel coordinate
+                                           // reference
 
   public static final String teamASecondaryBotBrainClassName = "terminator.SecondaryBotBrain"; //class given by name; is supposed to extends robotsimulator.Brain
-  public static final String teamASecondaryBotAvatar = "avatars/clumpsy.png"; //path relative to location of ant build.xml file
+  public static final String teamASecondaryBotAvatar = "avatars/zorro.png"; //path relative to location of ant build.xml file
   public static final double teamASecondaryBotRadius = 50, //1 unit = 1mm, body radius
                              teamASecondaryBotFrontalDetectionRange = 500, //1 unit = 1mm, range of frontal sensor
                              teamASecondaryBotFrontalDetectionAngle = 0, //UNUSED AT THE MOMENT, frontal sensor detection angle is suppoed to be absolute
@@ -59,7 +63,7 @@ public class Parameters {
   //---TEAM-B-PARAMETERS---//
   //-----------------------//
   public static final String teamBName = "Fantom Danger";
-  public static final String teamBMainBotBrainClassName = "algorithms.RandomFire"; //class given by name; is supposed to extends robotsimulator.Brain
+  public static final String teamBMainBotBrainClassName = "algorithms.CampFire"; //class given by name; is supposed to extends robotsimulator.Brain
   public static final String teamBMainBotAvatar = "avatars/hollowee.png"; //path relative to location of ant build.xml file
   public static final double teamBMainBotRadius = 50, //1 unit = 1mm, body radius
                              teamBMainBotFrontalDetectionRange = 300, //1 unit = 1mm, range of frontal sensor
@@ -77,7 +81,7 @@ public class Parameters {
                              teamBMainBot3InitY = 1200, //1 unit = 1mm, coordinate of central point
                              teamBMainBot3InitHeading = WEST; //clockwise trigonometric unit, according to screen pixel coordinate reference
 
-  public static final String teamBSecondaryBotBrainClassName = "algorithms.RandomFire"; //class given by name; is supposed to extends robotsimulator.Brain
+  public static final String teamBSecondaryBotBrainClassName = "algorithms.CampBot"; //class given by name; is supposed to extends robotsimulator.Brain
   public static final String teamBSecondaryBotAvatar = "avatars/fannyExplorer.png"; //path relative to location of ant build.xml file
   public static final double teamBSecondaryBotRadius = 50, //1 unit = 1mm, body radius
                              teamBSecondaryBotFrontalDetectionRange = 500, //1 unit = 1mm, range of frontal sensor

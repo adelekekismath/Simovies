@@ -126,8 +126,8 @@ public class PathFinder {
     }
 
     public static void main(String[] args) {
-        Coordonnate start = new Coordonnate(200, 200);
-        Coordonnate end = new Coordonnate(200, 1000);
+        Coordonnate start = new Coordonnate(250, 200);
+        Coordonnate end = new Coordonnate(350, 1000);
         ArrayList<Coordonnate> obstacles = new ArrayList<>();
         obstacles.add(new Coordonnate(200, 600));
         ArrayList<Coordonnate> path = findPath(start, end, obstacles);

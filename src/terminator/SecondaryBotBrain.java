@@ -16,12 +16,16 @@ public class SecondaryBotBrain extends Brain {
 
     private STATE currentState;
     private Coordonnate myPosition;
-    private boolean freeze;
-    private double oldAngle;
     private SIDE botSide;
     private static ArrayList<Coordonnate> obstaclesList = new ArrayList<>();
     private botName whoAmI;
-    private ArrayList<Coordonnate> pathToFollow;
+    private ArrayList<Coordonnate> pathToFollow = new ArrayList<>();
+    private boolean currentObjectiveReached = false;
+    private Coordonnate targetObjective;
+    private boolean goToTheOtherSideOnDeparture = false;
+    private double enemyDetected = 0;
+    private long lastMessageTime = 0; // Dernier moment où un message a été envoyé
+    private final long messageCooldown = 1000; // Temps minimum en millisecondes entre les messages
 
     public SecondaryBotBrain() {
         super();
@@ -34,7 +38,6 @@ public class SecondaryBotBrain extends Brain {
             e.printStackTrace();
         }
         currentState = STATE.MOVESTATE;
-        oldAngle = myGetHeading();
     }
 
     public void step() {
@@ -133,7 +136,7 @@ public class SecondaryBotBrain extends Brain {
         double initY = Parameters.class.getField(prefix + botNumber + "InitY").getDouble(null)
                 * Math.sin(myGetHeading());
 
-        whoAmI = botName.valueOf(prefix + botNumber);
+        whoAmI = botName.valueOf("ZORRO" + botNumber);
         myPosition = new Coordonnate(initX, initY);
         sendLogMessage("I am " + whoAmI + " at " + myPosition);
     }

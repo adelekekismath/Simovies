@@ -1,11 +1,12 @@
 package terminator;
 
 enum STATE {
-    DEPARTURESTATE,
     MOVESTATE,
+    MOVEBACKSTATE,
     TURNRIGHTSTATE,
     TURNLEFTSTATE,
-    FIRESTATE
+    FIRESTATE,
+    SINK
 };
 
 enum SIDE {
