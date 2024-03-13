@@ -1,4 +1,4 @@
-package terminator;
+package hyperHeros;
 
 class PolarCoordinate {
 

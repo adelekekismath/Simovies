@@ -1,4 +1,4 @@
-package terminator;
+package hyperHeros;
 
 public class Coordonnate {
     public double x, y;

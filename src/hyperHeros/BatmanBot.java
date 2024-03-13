@@ -1,20 +1,15 @@
-package terminator;
+package hyperHeros;
 
 import robotsimulator.Brain;
 import characteristics.Parameters;
-import characteristics.IFrontSensorResult;
 import characteristics.IRadarResult;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Random;
 
-public class MainBotBrain extends Brain {
+public class BatmanBot extends Brain {
 
-    private static final double PRECISION = 0.01;
-    private static final double FIREANGLEPRECISION = Math.PI / (double) 6;
     private static final double ANGLEPRECISION = 0.01;
-
     private STATE currentState;
     private Coordonnate myPosition;
     private SIDE botSide;
@@ -25,10 +20,12 @@ public class MainBotBrain extends Brain {
     private Coordonnate targetObjective;
     private boolean goToTheOtherSideOnDeparture = false;
     private double enemyDetected = 0;
+    private ArrayList<String> allMessagesFromAllies = new ArrayList<>();
+    private ArrayList<String> historySendMessages = new ArrayList<>();
     private long lastMessageTime = 0; // Dernier moment où un message a été envoyé
     private final long messageCooldown = 1000; // Temps minimum en millisecondes entre les messages
 
-    public MainBotBrain() {
+    public BatmanBot() {
         super();
     }
 
@@ -38,7 +35,7 @@ public class MainBotBrain extends Brain {
         } catch (IllegalArgumentException | IllegalAccessException | NoSuchFieldException | SecurityException e) {
             e.printStackTrace();
         }
-        takePlaceForDéparture();
+        takePlaceForDeparture();
         goToTheOtherSideOnDeparture = true;
         currentState = STATE.SINK;
     }
@@ -47,45 +44,42 @@ public class MainBotBrain extends Brain {
 
         // COMMUNICATION
         ArrayList<String> messages = fetchAllMessages();
-        for (String msg : messages) {
-            String[] parts = msg.split(";");
-            HashMap<String, String> messageMap = new HashMap<>();
-            for (String part : parts) {
-                String[] keyValue = part.split(":");
-                messageMap.put(keyValue[0], keyValue[1]);
-            }
-            if ("enemyPosition".equals(messageMap.get("type"))) {
-                if (myPosition.distance(new Coordonnate(Double.parseDouble(messageMap.get("x")),
-                        Double.parseDouble(messageMap.get("y"))) ) < 500) {
-                    targetObjective = new Coordonnate(Double.parseDouble(messageMap.get("x")) - 100,
-                            Double.parseDouble(messageMap.get("y")) -100);
-                    
+        if (!messages.isEmpty()) allMessagesFromAllies.addAll(messages);
+        if (!allMessagesFromAllies.isEmpty()) {
+            String msg = allMessagesFromAllies.remove(0);
+            HashMap<String, String> messageMap = decomposeMessage(msg);
+            sendLogMessage("by: " + messageMap.get("by") + "for" + messageMap.get("type") + "x:"
+                    + messageMap.get("x"));
+            if (!messageMap.get("by").equals(whoAmI.toString())) {
+                // if ("enemyPosition".equals(messageMap.get("type"))) {
+                //     if (myPosition.distance(new Coordonnate(Double.parseDouble(messageMap.get("x")),
+                //             Double.parseDouble(messageMap.get("y")))) < 1000) {
+                //         targetObjective = new Coordonnate(Double.parseDouble(messageMap.get("x")) - 100,
+                //                 Double.parseDouble(messageMap.get("y")) - 100);
+                //     }
+                // } 
+                if ("someOneIsDead".equals(messageMap.get("type"))) {
+                    addObstacle(new Coordonnate(Double.parseDouble(messageMap.get("x")),
+                            Double.parseDouble(messageMap.get("y"))));
                 }
-            } else if ("iamDead".equals(messageMap.get("type"))) {
-                addObstacle(new Coordonnate(Double.parseDouble(messageMap.get("x")), Double.parseDouble(messageMap.get("y"))));
             }
         }
-
         // Traiter les résultats radar
         processRadarResults(detectRadar());
-
         if (enemyDetected != 0) {
             // Si un ennemi est détecté et tiré, ne pas bouger et attendre le prochain cycle
             fire(enemyDetected);
             enemyDetected = 0;
             return;
         }
-
         // Si mort, arrêter l'exécution
         if (getHealth() <= 0) {
-            broadcast(getLogMessage());
-            addObstacle(myPosition);
+            sendMessageToAllies(
+                    "type:someOneIsDead;x:" + myPosition.getX() + ";y:" + myPosition.getY() + ";by:" + whoAmI);
             return;
         }
-
         // Suivre le chemin si disponible
         if (currentObjectiveReached) {
-            System.out.println("I have reached the target");
             if (!pathToFollow.isEmpty()) {
                 setObjective(pathToFollow.get(0));
                 pathToFollow.remove(0);
@@ -93,7 +87,7 @@ public class MainBotBrain extends Brain {
                 if (goToTheOtherSideOnDeparture)
                 {
                     goToTheOtherSideOnDeparture = false;
-                    one_two_three_go();
+                    goToTheOtherSide();
                 }
                 else pathToFollow = findPath(myPosition);
             }
@@ -101,15 +95,8 @@ public class MainBotBrain extends Brain {
         goToTarget();
 
         if (currentState == STATE.MOVESTATE) {
-            // Mettre à jour la myPosition actuelle du robot
-            if (detectFront().getObjectType() == IFrontSensorResult.Types.WALL) {
-                currentState = STATE.TURNLEFTSTATE;
-                stepTurn(Parameters.Direction.LEFT);
-                return;
-            } else {
-                walk(false);
-                return;
-            }
+            walk(false);
+            return;
         } else if (currentState == STATE.MOVEBACKSTATE) {
             walk(true);
             return;
@@ -152,28 +139,25 @@ public class MainBotBrain extends Brain {
                 return;
         }
         obstaclesList.add(pos);
-        one_two_three_go();
+        goToTheOtherSide();
     }
 
-    public void one_two_three_go() {
-        System.out.println("I am going to the default path");
+    public void goToTheOtherSide() {
         int destinationX = botSide == SIDE.LEFT ? 2900 : 2000;
-        int[] yCoordinates = { 600, 1200, 400, 1100, 1700 }; // y coordinates for the bots
 
         if (whoAmI == botName.BATTMAN1) {
-            pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX,
-                    yCoordinates[2]), obstaclesList);
+            pathToFollow = BreadthFirstSearch.findPath(myPosition, new Coordonnate(destinationX,
+                    400), obstaclesList);
         } else if (whoAmI == botName.BATTMAN2) {
-            pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX,
-                    yCoordinates[3]), obstaclesList);
+            pathToFollow = BreadthFirstSearch.findPath(myPosition, new Coordonnate(destinationX,
+                    1100), obstaclesList);
         } else if (whoAmI == botName.BATTMAN3) {
-            pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX,
-                    yCoordinates[4]), obstaclesList);
+            pathToFollow = BreadthFirstSearch.findPath(myPosition, new Coordonnate(destinationX,
+                    1800), obstaclesList);
         }
     }
 
     private ArrayList<Coordonnate> findPath(Coordonnate coord) {
-        System.out.println("find a path");
         Coordonnate upLeft = new Coordonnate(200, 200);
         Coordonnate underUpLeft = new Coordonnate(400, 1000);
         Coordonnate righterUpLeft = new Coordonnate(1200, 200);
@@ -181,24 +165,24 @@ public class MainBotBrain extends Brain {
         Coordonnate upperDownRight = new Coordonnate(2800, 1000);
         ArrayList<Coordonnate> res = new ArrayList<>();
 
-        res.addAll(PathFinder.findPath(coord, underUpLeft, obstaclesList));
-        res.addAll(PathFinder.findPath(underUpLeft, upLeft, obstaclesList));
-        res.addAll(PathFinder.findPath(upLeft, righterUpLeft, obstaclesList));
-        res.addAll(PathFinder.findPath(righterUpLeft, downRight, obstaclesList));
-        res.addAll(PathFinder.findPath(downRight, upperDownRight, obstaclesList));
+        res.addAll(BreadthFirstSearch.findPath(coord, underUpLeft, obstaclesList));
+        res.addAll(BreadthFirstSearch.findPath(underUpLeft, upLeft, obstaclesList));
+        res.addAll(BreadthFirstSearch.findPath(upLeft, righterUpLeft, obstaclesList));
+        res.addAll(BreadthFirstSearch.findPath(righterUpLeft, downRight, obstaclesList));
+        res.addAll(BreadthFirstSearch.findPath(downRight, upperDownRight, obstaclesList));
         return res;
     }
 
-    private void takePlaceForDéparture() {
+    private void takePlaceForDeparture() {
         switch (whoAmI) {
             case BATTMAN1:
-                targetObjective = new Coordonnate(botSide == SIDE.LEFT ? 400 : 2500, 500);
+                targetObjective = new Coordonnate(botSide == SIDE.LEFT ? 500 : 2500, 400);
                 break;
             case BATTMAN2:
-                targetObjective = new Coordonnate(botSide == SIDE.LEFT ? 300 : 2700, 1100);
+                targetObjective = new Coordonnate(botSide == SIDE.LEFT ? 400 : 2600, 1000);
                 break;
             case BATTMAN3:
-                targetObjective = new Coordonnate(botSide == SIDE.LEFT ? 400 : 2500, 1700);
+                targetObjective = new Coordonnate(botSide == SIDE.LEFT ? 500 : 2500, 1600);
                 break;
             default:
                 break;
@@ -256,24 +240,29 @@ public class MainBotBrain extends Brain {
                 fire(r.getObjectDirection());
                 enemyDetected = r.getObjectDirection();
                 return;
+            } else if (r.getObjectType() == IRadarResult.Types.Wreck) {
+                Coordonnate wreckPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
+                        r.getObjectDistance());
+                addObstacle(wreckPosition);
+                sendMessageToAllies("type:someOneIsDead;x:" + wreckPosition.getX() + ";y:" + wreckPosition.getY() + ";by:"
+                        + whoAmI);
             }
-            // if (r.getObjectType() == IRadarResult.Types.Wreck && r.getObjectDistance() <= 150) {
-            //     currentState = STATE.TURNLEFTSTATE;
-            //     sendLogMessage("Wreck detected at " + r.getObjectDistance() + "m");
-            // }
-            // if ((r.getObjectType() == IRadarResult.Types.TeamMainBot
-            //         || r.getObjectType() == IRadarResult.Types.TeamSecondaryBot) &&
-            //         r.getObjectDistance() <= 150) {
-            //     currentState = STATE.TURNLEFTSTATE;
-            //     sendLogMessage("Ally detected at " + r.getObjectDistance() + "m");
-            // }
+        }
+    }
+    
+    private void sendMessageToAllies(String message) {
+        if (System.currentTimeMillis() - lastMessageTime > messageCooldown) {
+            if(!historySendMessages.contains(message)) {
+                broadcast(message);
+                historySendMessages.add(message);
+            }
+            lastMessageTime = System.currentTimeMillis();
         }
     }
 
     private void  goToTarget() {
         currentObjectiveReached = false;
         PolarCoordinate polarInstance = CoordinateTransform.convertCartesianToPolar(myPosition, targetObjective);
-        if (whoAmI == botName.BATTMAN1) System.out.println("Distance to target: " + polarInstance.getDist());
         if ( polarInstance.getDist() > 10) {
             if (isSameDirection(polarInstance.getAngle())) {
                 currentState = STATE.MOVESTATE;
@@ -285,7 +274,6 @@ public class MainBotBrain extends Brain {
                 currentState = determineTurnDirection(polarInstance.getAngle());  
             }
         } else {
-            if (whoAmI == botName.BATTMAN1) sendLogMessage("I have reached the target");
             currentObjectiveReached = true;
             currentState = STATE.SINK;  
         }
@@ -330,7 +318,21 @@ public class MainBotBrain extends Brain {
         }
     }
 
-    public Coordonnate getPositionByDirectionAndDistance (Coordonnate position, double direction, double distance) {
-        return new Coordonnate(position.getX() + distance * Math.cos(direction), position.getY() + distance * Math.sin(direction));
+    public Coordonnate getPositionByDirectionAndDistance(Coordonnate position, double direction, double distance) {
+        return new Coordonnate(position.getX() + distance * Math.cos(direction),
+                position.getY() + distance * Math.sin(direction));
+    }
+    
+    private HashMap<String, String> decomposeMessage(String message) {
+        HashMap<String, String> details = new HashMap<>();
+        String[] parts = message.split(";");
+        
+        for (String part : parts) {
+            String[] keyValue = part.split(":");
+            if (keyValue.length == 2) {
+                details.put(keyValue[0], keyValue[1]);
+            }
+        }
+        return details;
     }
 }
