@@ -21,10 +21,7 @@ public class ZorroBot  extends Brain{
     private boolean currentObjectiveReached = false;
     private Coordonnate targetObjective;
     private boolean goToTheOtherSideOnDeparture = false;
-    private ArrayList<String> allMessagesFromAllies = new ArrayList<>();
     private ArrayList<String> historySendMessages = new ArrayList<>();
-    private long lastMessageTime = 0; // Dernier moment où un message a été envoyé
-    private static final long messageCooldown = 1000; // Temps minimum en millisecondes entre les messages
     private static HashMap<botName, Coordonnate> allAlliesPositions = new HashMap<>();
 
     public ZorroBot() {
@@ -32,7 +29,6 @@ public class ZorroBot  extends Brain{
     }
 
     public void activate() {
-
         try {
             nominateBot();
         } catch (Exception e) {
@@ -45,11 +41,74 @@ public class ZorroBot  extends Brain{
 
 
     public void step() {
-        // COMMUNICATION
+        if (getHealth() > 0)
+            processAlliesMessages();
+
+        treatWhatIamSeeing();
+
+        runThereIsDanger = false;
+        if (getHealth() <= 0) {
+            sendMessageToAllies("type:someOneIsDead;x:" + myPosition.getX() + ";y:" + myPosition.getY() + ";by:" + whoAmI);
+            return;
+        }
+
+        if (!runThereIsDanger) {
+            // Suivre le chemin si disponible
+            if (currentObjectiveReached || targetObjective == null) {
+                if (!pathToFollow.isEmpty()) {
+                    targetObjective = pathToFollow.get(0);
+                    pathToFollow.remove(0);
+                } else {
+                    goToTheOtherSide();
+                }
+            }
+            goToTarget();
+        }
+
+        if (currentState == STATE.MOVESTATE) {
+            walk(false);
+        } else if (currentState == STATE.MOVEBACKSTATE) {
+            walk(true);
+        } else if (currentState == STATE.TURNRIGHTSTATE) {
+            stepTurn(Parameters.Direction.RIGHT);
+        } else if (currentState == STATE.TURNLEFTSTATE) {
+            stepTurn(Parameters.Direction.LEFT);
+        } else if (currentState == STATE.SINK) {
+            // Do nothing
+        }
+    }
+    
+    private void treatWhatIamSeeing() {
+        ArrayList<IRadarResult> radarResults = detectRadar();
+        for (IRadarResult r : radarResults) {
+            if (r.getObjectType() == IRadarResult.Types.Wreck) {
+                Coordonnate wreckPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
+                        r.getObjectDistance());
+                if (addObstacle(wreckPosition))
+                    sendMessageToAllies("type:someOneIsDead;x:" + wreckPosition.getX() + ";y:" + wreckPosition.getY()
+                            + ";by:" + whoAmI);
+                break;
+            }
+            if (r.getObjectType() == IRadarResult.Types.BULLET
+                    || r.getObjectType() == IRadarResult.Types.OpponentMainBot
+                    || r.getObjectType() == IRadarResult.Types.OpponentSecondaryBot) {
+                if (r.getObjectType() != IRadarResult.Types.OpponentSecondaryBot) {
+                    runThereIsDanger = true;
+                    currentState = currentState == STATE.MOVEBACKSTATE ? STATE.MOVESTATE : STATE.MOVEBACKSTATE;
+                }
+                Coordonnate enemyPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(), r.getObjectDistance());
+                sendMessageToAllies("type:enemyPosition;x:" + enemyPosition.getX() + 50 + ";y:" + enemyPosition.getY() + 50 + ";by:" + whoAmI + ";direction:" + r.getObjectDirection());
+                break;
+            }
+        }
+    }
+
+    private void processAlliesMessages(){
         ArrayList<String> messages = fetchAllMessages();
+        ArrayList<String> allMessagesFromAllies = new ArrayList<>();
         if (!messages.isEmpty())
             allMessagesFromAllies.addAll(messages);
-        if (!allMessagesFromAllies.isEmpty() ) {
+        if (!allMessagesFromAllies.isEmpty()) {
             String msg = allMessagesFromAllies.remove(0);
             HashMap<String, String> messageMap = decomposeMessage(msg);
             if (!messageMap.get("by").equals(whoAmI.toString())) {
@@ -61,86 +120,16 @@ public class ZorroBot  extends Brain{
                 }
             }
         }
-        runThereIsDanger = false;
-        ArrayList<IRadarResult> radarResults = detectRadar();
-
-        if (getHealth() <= 0) {
-            sendMessageToAllies(
-                    "type:someOneIsDead;x:" + myPosition.getX() + ";y:" + myPosition.getY() + ";by:" + whoAmI);
-            return;
-        }
-
-        for (IRadarResult r : radarResults) {
-            if (r.getObjectType() == IRadarResult.Types.BULLET
-                    || r.getObjectType() == IRadarResult.Types.OpponentMainBot) {
-                currentState = STATE.MOVEBACKSTATE;
-                runThereIsDanger = true;
-                return;
-            }
-            if (r.getObjectType() == IRadarResult.Types.OpponentMainBot) {
-                Coordonnate enemyPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
-                        r.getObjectDistance());
-                sendMessageToAllies(
-                        "type:enemyPosition;x:" + enemyPosition.getX() + ";y:" + enemyPosition.getY() + ";by:"
-                                + whoAmI + ";direction:" + r.getObjectDirection());
-            }
-            if (r.getObjectType() == IRadarResult.Types.Wreck) {
-                Coordonnate wreckPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
-                        r.getObjectDistance());
-                addObstacle(wreckPosition);
-                sendMessageToAllies("type:someOneIsDead;x:" + wreckPosition.getX() + ";y:" + wreckPosition.getY()
-                        + ";by:" + whoAmI);
-            }
-        }
-
-        if (!runThereIsDanger) {
-            // Suivre le chemin si disponible
-            if (currentObjectiveReached || targetObjective == null) {
-                if (!pathToFollow.isEmpty()) {
-                    targetObjective = pathToFollow.get(0);
-                    pathToFollow.remove(0);
-                } else {
-                    if (goToTheOtherSideOnDeparture) {
-                        goToTheOtherSideOnDeparture = false;
-                        String messageType = whoAmI == botName.ZORRO1 ? "youCanStartBot1" : "youCanStartBot3";
-                        sendMessageToAllies("type:" + messageType + ";by:" + whoAmI + ";x:" + myPosition.getX() + ";y:"
-                                + myPosition.getY());
-                        goToTheOtherSide();
-                    } else
-                        pathToFollow = findPath(myPosition);
-                }
-            }
-            goToTarget();
-        }
-
-        if (currentState == STATE.MOVESTATE) {
-            walk(false);
-            return;
-        } else if (currentState == STATE.MOVEBACKSTATE) {
-            System.out.println("I am moving back");
-            moveBack();
-            myPosition = getNextPosition(-1);
-            return;
-        } else if (currentState == STATE.TURNRIGHTSTATE) {
-            stepTurn(Parameters.Direction.RIGHT);
-            return;
-        } else if (currentState == STATE.TURNLEFTSTATE) {
-            stepTurn(Parameters.Direction.LEFT);
-            return;
-        } else if (currentState == STATE.SINK) {
-            System.out.println("I am sinking");
-            return;
-        }
     }
 
     private void walk(boolean back) {
         Coordonnate newBotPosition = getNextPosition(back ? -1 : 1);
-        // for (IRadarResult r : detectRadar()) {
-        //     if (newBotPosition.distance(getPositionByDirectionAndDistance(newBotPosition, r.getObjectDirection(),
-        //             r.getObjectDistance())) < Parameters.teamAMainBotRadius * 2) {
-        //         return;
-        //     }
-        // }
+        for (IRadarResult r : detectRadar()) {
+            if (newBotPosition.distance(getPositionByDirectionAndDistance(newBotPosition, r.getObjectDirection(),
+                    r.getObjectDistance())) < Parameters.teamAMainBotRadius * 2 || outOfBounds(newBotPosition)) {
+                return;
+            }
+        }
         if (back) {
             moveBack();
         } else {
@@ -150,20 +139,8 @@ public class ZorroBot  extends Brain{
         sendMessageToAllies("type:position;x:" + myPosition.getX() + ";y:" + myPosition.getY() + ";by:" + whoAmI);
     }
 
-    private ArrayList<Coordonnate> findPath(Coordonnate coord) {
-        Coordonnate upLeft = new Coordonnate(200, 200);
-        Coordonnate underUpLeft = new Coordonnate(400, 1000);
-        Coordonnate righterUpLeft = new Coordonnate(1200, 200);
-        Coordonnate downRight = new Coordonnate(2600, 1800);
-        Coordonnate upperDownRight = new Coordonnate(2800, 1000);
-        ArrayList<Coordonnate> res = new ArrayList<>();
-
-        res.addAll(PathFinder.findPath(coord, underUpLeft, obstaclesList));
-        res.addAll(PathFinder.findPath(underUpLeft, upLeft, obstaclesList));
-        res.addAll(PathFinder.findPath(upLeft, righterUpLeft, obstaclesList));
-        res.addAll(PathFinder.findPath(righterUpLeft, downRight, obstaclesList));
-        res.addAll(PathFinder.findPath(downRight, upperDownRight, obstaclesList));
-        return res;
+    private boolean outOfBounds(Coordonnate position) {
+        return position.getX() <= 100 || position.getX() >= 3000 || position.getY() <= 100 || position.getY() >= 2000;
     }
 
     private Coordonnate getPositionByDirectionAndDistance(Coordonnate position, double direction, double distance) {
@@ -172,12 +149,9 @@ public class ZorroBot  extends Brain{
     }
 
     private void sendMessageToAllies(String message) {
-        if (System.currentTimeMillis() - lastMessageTime > messageCooldown) {
-            if (!historySendMessages.contains(message)) {
-                broadcast(message);
-                historySendMessages.add(message);
-                lastMessageTime = System.currentTimeMillis();
-            }
+        if (!historySendMessages.contains(message)) {
+            broadcast(message);
+            historySendMessages.add(message);
         }
     }
 
@@ -269,13 +243,14 @@ public class ZorroBot  extends Brain{
         return details;
     }
 
-    private void addObstacle(Coordonnate pos) {
+    private boolean addObstacle(Coordonnate pos) {
         for (Coordonnate obtacle : obstaclesList) {
             if (Math.abs(obtacle.getX() - pos.getX()) < 1 && Math.abs(obtacle.getY() - pos.getY()) < 1)
-                return;
+                return false;
         }
         obstaclesList.add(pos);
         goToTheOtherSide();
+        return true;
     }
 
     public void takePlaceForDeparture() {
@@ -299,13 +274,13 @@ public class ZorroBot  extends Brain{
         }
     }
 
-    public void goToTheOtherSide() {    
-        int destinationX = botSide == SIDE.LEFT ? 2800 : 2000;
+    public void goToTheOtherSide() {
+        int destinationX = myPosition.getX() < 1400 ? 2800 : 200;
 
         if (whoAmI == botName.ZORRO1) {
             pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX, 600), obstaclesList);
         } else if (whoAmI == botName.ZORRO2) {
-            pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX, 1500), obstaclesList);
+            pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX, 1600), obstaclesList);
         }
     }
 
@@ -333,9 +308,5 @@ public class ZorroBot  extends Brain{
                 allAlliesPositions.put(bot, null);
             }
         }
-    }
-    
-    private void fireTarget() {
-
     }
 }

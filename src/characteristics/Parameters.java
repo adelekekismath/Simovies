@@ -21,8 +21,8 @@ public class Parameters {
   //-----------------------//
   //---TEAM-A-PARAMETERS---//
   //-----------------------//
-  public static final String teamAName = "KD Runners";
-  public static final String teamAMainBotBrainClassName = "hyperHeros.BatmanBot"; //class given by name; is supposed to extends robotsimulator.Brain
+  public static final String teamAName = "Combinaison";
+  public static final String teamAMainBotBrainClassName = "algorithms.Combinaison"; //class given by name; is supposed to extends robotsimulator.Brain
   public static final String teamAMainBotAvatar = "avatars/batman.png"; //path relative to location of ant build.xml file
   public static final double teamAMainBotRadius = 50, // 1 unit = 1mm, body radius
           teamAMainBotFrontalDetectionRange = 300, // 1 unit = 1mm, range of frontal sensor
@@ -44,7 +44,7 @@ public class Parameters {
           teamAMainBot3InitHeading = EAST; // clockwise trigonometric unit, according to screen pixel coordinate
                                            // reference
 
-  public static final String teamASecondaryBotBrainClassName = "hyperHeros.ZorroBot"; //class given by name; is supposed to extends robotsimulator.Brain
+  public static final String teamASecondaryBotBrainClassName = "algorithms.Combinaison"; //class given by name; is supposed to extends robotsimulator.Brain
   public static final String teamASecondaryBotAvatar = "avatars/zorro.png"; //path relative to location of ant build.xml file
   public static final double teamASecondaryBotRadius = 50, //1 unit = 1mm, body radius
                              teamASecondaryBotFrontalDetectionRange = 500, //1 unit = 1mm, range of frontal sensor
@@ -62,8 +62,8 @@ public class Parameters {
   //-----------------------//
   //---TEAM-B-PARAMETERS---//
   //-----------------------//
-  public static final String teamBName = "Fantom Danger";
-  public static final String teamBMainBotBrainClassName = "algorithms.BootingBerzerk"; //class given by name; is supposed to extends robotsimulator.Brain
+  public static final String teamBName = "hyperHeros";
+  public static final String teamBMainBotBrainClassName = "hyperHeros.BatmanBot"; //class given by name; is supposed to extends robotsimulator.Brain
   public static final String teamBMainBotAvatar = "avatars/hollowee.png"; //path relative to location of ant build.xml file
   public static final double teamBMainBotRadius = 50, //1 unit = 1mm, body radius
                              teamBMainBotFrontalDetectionRange = 300, //1 unit = 1mm, range of frontal sensor
@@ -81,7 +81,7 @@ public class Parameters {
                              teamBMainBot3InitY = 1200, //1 unit = 1mm, coordinate of central point
                              teamBMainBot3InitHeading = WEST; //clockwise trigonometric unit, according to screen pixel coordinate reference
 
-  public static final String teamBSecondaryBotBrainClassName = "algorithms.BootingBerzerk"; //class given by name; is supposed to extends robotsimulator.Brain
+  public static final String teamBSecondaryBotBrainClassName = "hyperHeros.ZorroBot"; //class given by name; is supposed to extends robotsimulator.Brain
   public static final String teamBSecondaryBotAvatar = "avatars/fannyExplorer.png"; //path relative to location of ant build.xml file
   public static final double teamBSecondaryBotRadius = 50, //1 unit = 1mm, body radius
                              teamBSecondaryBotFrontalDetectionRange = 500, //1 unit = 1mm, range of frontal sensor

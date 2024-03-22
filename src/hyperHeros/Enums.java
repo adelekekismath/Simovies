@@ -7,7 +7,7 @@ enum STATE {
     TURNLEFTSTATE,
     FIRESTATE,
     SINK
-};
+}
 
 enum SIDE {
     LEFT,
