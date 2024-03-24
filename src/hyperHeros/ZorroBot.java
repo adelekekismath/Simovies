@@ -20,7 +20,6 @@ public class ZorroBot  extends Brain{
     private ArrayList<Coordonnate> pathToFollow = new ArrayList<>();
     private boolean currentObjectiveReached = false;
     private Coordonnate targetObjective;
-    private boolean goToTheOtherSideOnDeparture = false;
     private ArrayList<String> historySendMessages = new ArrayList<>();
     private static HashMap<botName, Coordonnate> allAlliesPositions = new HashMap<>();
 
@@ -35,7 +34,6 @@ public class ZorroBot  extends Brain{
             e.printStackTrace();
         }
         takePlaceForDeparture();
-        goToTheOtherSideOnDeparture = true;
         currentState = STATE.SINK;
     }
 
@@ -48,11 +46,14 @@ public class ZorroBot  extends Brain{
 
         runThereIsDanger = false;
         if (getHealth() <= 0) {
-            sendMessageToAllies("type:someOneIsDead;x:" + myPosition.getX() + ";y:" + myPosition.getY() + ";by:" + whoAmI);
+            sendMessageToAllies("type:wreck;x:" + myPosition.getX() + ";y:" + myPosition.getY() + ";by:" + whoAmI);
             return;
         }
 
-        if (!runThereIsDanger) {
+        if (runThereIsDanger) {
+            // En cas de danger, le robot recule d'un pas
+            currentState = currentState == STATE.MOVEBACKSTATE ? STATE.MOVESTATE : STATE.MOVEBACKSTATE;
+        } else {
             // Suivre le chemin si disponible
             if (currentObjectiveReached || targetObjective == null) {
                 if (!pathToFollow.isEmpty()) {
@@ -85,19 +86,22 @@ public class ZorroBot  extends Brain{
                 Coordonnate wreckPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
                         r.getObjectDistance());
                 if (addObstacle(wreckPosition))
-                    sendMessageToAllies("type:someOneIsDead;x:" + wreckPosition.getX() + ";y:" + wreckPosition.getY()
+                    sendMessageToAllies("type:wreck;x:" + wreckPosition.getX() + ";y:" + wreckPosition.getY()
                             + ";by:" + whoAmI);
-                break;
-            }
+            }   
             if (r.getObjectType() == IRadarResult.Types.BULLET
                     || r.getObjectType() == IRadarResult.Types.OpponentMainBot
                     || r.getObjectType() == IRadarResult.Types.OpponentSecondaryBot) {
-                if (r.getObjectType() != IRadarResult.Types.OpponentSecondaryBot) {
+                if (r.getObjectType() != IRadarResult.Types.OpponentSecondaryBot && r.getObjectDistance() < 300) {
                     runThereIsDanger = true;
-                    currentState = currentState == STATE.MOVEBACKSTATE ? STATE.MOVESTATE : STATE.MOVEBACKSTATE;
                 }
-                Coordonnate enemyPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(), r.getObjectDistance());
-                sendMessageToAllies("type:enemyPosition;x:" + enemyPosition.getX() + 50 + ";y:" + enemyPosition.getY() + 50 + ";by:" + whoAmI + ";direction:" + r.getObjectDirection());
+                if (r.getObjectType() == IRadarResult.Types.OpponentMainBot || r.getObjectType() == IRadarResult.Types.OpponentSecondaryBot) {
+                    Coordonnate enemyPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
+                            r.getObjectDistance());
+                    sendLogMessage("Detected enemy at " + enemyPosition);
+                    sendMessageToAllies("type:enemyPosition;x:" + enemyPosition.getX() + 50 + ";y:" + enemyPosition.getY()
+                            + 50 + ";by:" + whoAmI + ";direction:" + r.getObjectDirection());
+                    }
                 break;
             }
         }
@@ -112,9 +116,9 @@ public class ZorroBot  extends Brain{
             String msg = allMessagesFromAllies.remove(0);
             HashMap<String, String> messageMap = decomposeMessage(msg);
             if (!messageMap.get("by").equals(whoAmI.toString())) {
-                sendLogMessage("Received: " + "by: " + messageMap.get("by") + " for " + messageMap.get("type") + " y:"
-                        + messageMap.get("y"));
-                if (!messageMap.get("by").equals(whoAmI.toString()) && "someOneIsDead".equals(messageMap.get("type"))) {
+                sendLogMessage("Received: " + "by: " + messageMap.get("by") + " for " + messageMap.get("type") + " at "
+                        + new Coordonnate(Double.parseDouble(messageMap.get("x")), Double.parseDouble(messageMap.get("y"))));
+                if (!messageMap.get("by").equals(whoAmI.toString()) && "wreck".equals(messageMap.get("type"))) {
                     addObstacle(new Coordonnate(Double.parseDouble(messageMap.get("x")),
                             Double.parseDouble(messageMap.get("y"))));
                 }

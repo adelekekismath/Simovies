@@ -21,6 +21,6 @@ public class Coordonnate {
     }
 
     public String toString() {
-        return "(" + x + ", " + y + ")";
+        return "(" + (int) x + ", " + (int)y + ")";
     }
 }
