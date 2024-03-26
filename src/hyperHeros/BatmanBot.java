@@ -51,6 +51,9 @@ public class BatmanBot extends Brain {
     private static HashMap<String, Coordonnate> allBotsPositions = new HashMap<>();
     private Coordonnate enemyPosition;
     private ArrayList<RobotMessage> historyTreatMessages = new ArrayList<>();
+    private int countFiringOnSamePosition = 0;
+    private int maxFiringOnSamePosition = 55;
+    private Coordonnate lastFiringPosition = null;
 
     public BatmanBot() {
         super();
@@ -62,24 +65,27 @@ public class BatmanBot extends Brain {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        takePlaceForDeparture();
+        //takePlaceForDeparture();
         goToTheOtherSideOnDeparture = true;
         currentState = STATE.SINK;
     }
 
     public void step() {
         // Récupérer les messages des alliés
-        handleAlliesMessage();
-        // Traiter les résultats radar
-        treatWhatIamSeeing(detectRadar());
-        // Si mort, arrêter l'exécution
+            handleAlliesMessage();
+            // Traiter les résultats radar
+            treatWhatIamSeeing(detectRadar());
+            
+            // Se déplacer vers l'objectif
+            moveToObjective();
+
         if (getHealth() <= 0) {
-            sendMessageToAllies(
+            // Si mort, arrêter l'exécution
+            broadcast(
                     "type:wreck;x:" + myPosition.getX() + ";y:" + myPosition.getY() + ";by:" + whoAmI);
             return;
         }
-        // Se déplacer vers l'objectif
-        moveToObjective();
+        
         // Exécuter l'état courant
         executeCurrentState();
     }
@@ -109,7 +115,7 @@ public class BatmanBot extends Brain {
 
     private void moveToObjective() {
         if (enemyDirection == 0) {
-            if (currentObjectiveReached) {
+            if (currentObjectiveReached || pathToFollow.isEmpty()) {
                 if (!pathToFollow.isEmpty()) {
                     setObjective(pathToFollow.get(0));
                     pathToFollow.remove(0);
@@ -117,6 +123,7 @@ public class BatmanBot extends Brain {
                     if (goToTheOtherSideOnDeparture) {
                         goToTheOtherSideOnDeparture = false;
                         goToTheOtherSide();
+                        setObjective(pathToFollow.get(0));
                     } else
                         pathToFollow = findPath(myPosition);
                 }
@@ -130,13 +137,10 @@ public class BatmanBot extends Brain {
         targets.addAll(allBotsPositions.values());
         targets.addAll(obstaclesList);
 
-        if (enemyPosition.getX() < 0 || enemyPosition.getY() < 0)
-            return false;
 
         for (Coordonnate target : targets) {
             double angle = CoordinateTransform.convertCartesianToPolar(myPosition, target).getAngle();
-            if (isRoughlySameDirection(angle, enemyDirection)
-                    && myPosition.distance(enemyPosition) > myPosition.distance(target)) {
+            if (isRoughlySameDirection(angle, enemyDirection)) {
                 currentState = STATE.MOVESTATE;
                 return false;
             }
@@ -160,21 +164,19 @@ public class BatmanBot extends Brain {
         processOtherMessages();
     }
 
-    private boolean isAlreadTreated(RobotMessage message) {
-        for (RobotMessage m : historyTreatMessages) {
-            if (m.isEquals(message)) {
-                return true;
-            }
-        }
-        return false;
-    }
+    // private boolean isAlreadTreated(RobotMessage message) {
+    //     for (RobotMessage m : historyTreatMessages) {
+    //         if (m.isEquals(message)) {
+    //             return true;
+    //         }
+    //     }
+    //     return false;
+    // }
 
     private void processWreckMessages() {
         for (RobotMessage message : messageQueue) {
-            if (message.type.equals("wreck") && !isAlreadTreated(message) ) {
+            if (message.type.equals("wreck") ) {
                 addObstacle(new Coordonnate(message.x, message.y));
-                message.isTreated();
-                historyTreatMessages.add(message);
             }
         }
         messageQueue.removeIf(message -> message.type.equals("wreck"));
@@ -182,7 +184,7 @@ public class BatmanBot extends Brain {
 
     private void processPositionMessages() {
         for (RobotMessage message : messageQueue) {
-            if (!message.by.equals(whoAmI.toString()) && message.type.equals("position")) {
+            if (!message.by.equals(whoAmI.toString()) ) {
                 allBotsPositions.put(message.by, new Coordonnate(message.x, message.y));
             }
         }
@@ -194,7 +196,7 @@ public class BatmanBot extends Brain {
             RobotMessage message = messageQueue.remove(0);
             sendLogMessage(
                     "by: " + message.by + " for " + message.type + " at " + new Coordonnate(message.x, message.y));
-            if (!message.by.equals(whoAmI.toString()) && !isAlreadTreated(message)) {
+            if (!message.by.equals(whoAmI.toString()) ) {
                 processEnemyPositionMessage(message);
             }
         }
@@ -209,8 +211,6 @@ public class BatmanBot extends Brain {
             } else {
                 enemyDirection = 0;
             }
-            message.isTreated();
-            historyTreatMessages.add(message);
         }
     }
 
@@ -254,7 +254,7 @@ public class BatmanBot extends Brain {
                 enemyDirection = r.getObjectDirection();
                 enemyPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
                         r.getObjectDistance());
-                sendMessageToAllies("type:enemyPosition;x:" + enemyPosition.getX() + ";y:" + enemyPosition.getY() + ";by:"
+                broadcast("type:enemyPosition;x:" + enemyPosition.getX() + ";y:" + enemyPosition.getY() + ";by:"
                         + whoAmI);
                 sendLogMessage("I see an enemy at " + enemyPosition);
                 if (canFireEnemy()) {
@@ -266,9 +266,11 @@ public class BatmanBot extends Brain {
                 Coordonnate wreckPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
                         r.getObjectDistance());
                 
-                if (addObstacle(wreckPosition))
-                    sendMessageToAllies("type:wreck;x:" + wreckPosition.getX() + ";y:" + wreckPosition.getY() + ";by:"
+                if (addObstacle(wreckPosition)) {
+                    goToTheOtherSide();
+                    broadcast("type:wreck;x:" + wreckPosition.getX() + ";y:" + wreckPosition.getY() + ";by:"
                         + whoAmI);
+                }
             }
         }
     }
@@ -304,35 +306,26 @@ public class BatmanBot extends Brain {
             move();
         }
         myPosition = newBotPosition;
-        sendMessageToAllies("type:position;x:" + myPosition.getX() + ";y:" + myPosition.getY() + ";by:" + whoAmI);
+        broadcast("type:position;x:" + myPosition.getX() + ";y:" + myPosition.getY() + ";by:" + whoAmI);
     }
 
     private ArrayList<Coordonnate> findPath(Coordonnate coord) {
-        Coordonnate upLeft = new Coordonnate(200, 200);
-        Coordonnate underUpLeft = new Coordonnate(400, 1000);
-        Coordonnate righterUpLeft = new Coordonnate(1200, 200);
-        Coordonnate downRight = new Coordonnate(2600, 1800);
-        Coordonnate upperDownRight = new Coordonnate(2800, 1000);
+        Coordonnate upLeft = new Coordonnate(400, 400);
+        Coordonnate underUpLeft = new Coordonnate(400, 1400);
+        Coordonnate righterUpLeft = new Coordonnate(2600, 400);
+        Coordonnate downRight = new Coordonnate(2600, 1400);
         ArrayList<Coordonnate> res = new ArrayList<>();
 
         res.addAll(PathFinder.findPath(coord, underUpLeft, obstaclesList));
         res.addAll(PathFinder.findPath(underUpLeft, upLeft, obstaclesList));
         res.addAll(PathFinder.findPath(upLeft, righterUpLeft, obstaclesList));
         res.addAll(PathFinder.findPath(righterUpLeft, downRight, obstaclesList));
-        res.addAll(PathFinder.findPath(downRight, upperDownRight, obstaclesList));
         return res;
     }
 
     private Coordonnate getPositionByDirectionAndDistance(Coordonnate position, double direction, double distance) {
         return new Coordonnate(position.getX() + distance * Math.cos(direction),
                 position.getY() + distance * Math.sin(direction));
-    }
-
-    private void sendMessageToAllies(String message) {
-        if (!historySendMessages.contains(message)) {
-            broadcast(message);
-            historySendMessages.add(message);
-        }
     }
 
     private Coordonnate getNextPosition(double back) {
@@ -369,11 +362,7 @@ public class BatmanBot extends Brain {
     }
 
     private boolean isRoughlySameDirection(double dir1, double dir2) {
-        double difference = Math.abs(dir1 - dir2);
-        if (difference > Math.PI) {
-            difference = 2 * Math.PI - difference;
-        }
-        return difference < Math.PI / 23;
+        return Math.abs(normalizeRadian(dir1) - normalizeRadian(dir2)) < Math.PI / 23;
     }
 
     public boolean isOppositeDirection(double dir) {
@@ -441,23 +430,33 @@ public class BatmanBot extends Brain {
                 return false;
         }
         obstaclesList.add(pos);
-        goToTheOtherSide();
         return true;
     }
 
-    private void fireTarget(double enemyDirection, Coordonnate enemyPosition) {
-        ArrayList<Coordonnate> targets = new ArrayList<>();
-        targets.addAll(allBotsPositions.values());
-        targets.addAll(obstaclesList);
-
-        for(Coordonnate target : targets) {
-            double angle = CoordinateTransform.convertCartesianToPolar(myPosition, target).getAngle();
-            if (isRoughlySameDirection(angle, enemyDirection)
-                    && myPosition.distance(enemyPosition) > myPosition.distance(target)) {
-                currentState = STATE.MOVESTATE;
-                return;
+    private void fireTarget(double enemyDirection) {
+        if (lastFiringPosition != null) {
+            if (lastFiringPosition.equals(myPosition)) {
+                if (countFiringOnSamePosition < maxFiringOnSamePosition) {
+                    fire(enemyDirection);
+                    countFiringOnSamePosition++;
+                } else {
+                    System.out.println("I am blocked");
+                    countFiringOnSamePosition = 0;
+                    walk(false);
+                    walk(false);
+                    walk(false);
+                }
+            } else {
+                lastFiringPosition = myPosition;
+                fire(enemyDirection);
+                countFiringOnSamePosition = 0;
+                countFiringOnSamePosition++;
             }
+        } else {
+            lastFiringPosition = myPosition;
+            fire(enemyDirection);
+            countFiringOnSamePosition = 0;
+            countFiringOnSamePosition++;
         }
-        fire(enemyDirection);
     }
 }
