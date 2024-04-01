@@ -21,6 +21,12 @@ public class ZorroBot  extends Brain{
     private boolean currentObjectiveReached = false;
     private Coordonnate targetObjective;
     private static HashMap<botName, Coordonnate> allAlliesPositions = new HashMap<>();
+    private boolean goToTheOtherSideOnDeparture = false;
+    private ORDER currentOrder;
+
+    private enum ORDER {
+        WAITINGTOGO, GOING
+    }
 
     public ZorroBot() {
         super();
@@ -33,11 +39,13 @@ public class ZorroBot  extends Brain{
             e.printStackTrace();
         }
         takePlaceForDeparture();
+        currentOrder = ORDER.WAITINGTOGO;
         currentState = STATE.SINK;
     }
 
 
     public void step() {
+        currentState = STATE.SINK;
         if (getHealth() > 0)
             processAlliesMessages();
         runThereIsDanger = false;
@@ -49,15 +57,20 @@ public class ZorroBot  extends Brain{
 
         if (runThereIsDanger) {
             // En cas de danger, le robot recule d'un pas
-            currentState = currentState == STATE.MOVEBACKSTATE ? STATE.MOVESTATE : STATE.MOVEBACKSTATE;
+            currentState = STATE.SINK;
         } else {
             // Suivre le chemin si disponible
-            if (currentObjectiveReached || targetObjective == null) {
+            if (currentObjectiveReached) {
                 if (!pathToFollow.isEmpty()) {
                     targetObjective = pathToFollow.get(0);
                     pathToFollow.remove(0);
                 } else {
-                    goToTheOtherSide();
+                    if (goToTheOtherSideOnDeparture) {
+                        goToTheOtherSideOnDeparture = false;
+                        currentOrder = ORDER.GOING;
+                        goToTheOtherSide();
+                    } else if(currentOrder == ORDER.GOING)
+                        pathToFollow = findPath(myPosition);
                 }
             }
             goToTarget();
@@ -86,25 +99,40 @@ public class ZorroBot  extends Brain{
                     goToTheOtherSide();
                     broadcast("type:wreck;x:" + wreckPosition.getX() + ";y:" + wreckPosition.getY()
                             + ";by:" + whoAmI);
-                    
+
                 }
-            }   
+            }
             if (r.getObjectType() == IRadarResult.Types.BULLET
                     || r.getObjectType() == IRadarResult.Types.OpponentMainBot
                     || r.getObjectType() == IRadarResult.Types.OpponentSecondaryBot) {
-                if (r.getObjectType() != IRadarResult.Types.BULLET ) {
+                if (r.getObjectType() != IRadarResult.Types.BULLET) {
                     runThereIsDanger = true;
                 }
-                if (r.getObjectType() == IRadarResult.Types.OpponentMainBot || r.getObjectType() == IRadarResult.Types.OpponentSecondaryBot){
+                if (r.getObjectType() == IRadarResult.Types.OpponentMainBot
+                        || r.getObjectType() == IRadarResult.Types.OpponentSecondaryBot) {
                     Coordonnate enemyPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
                             r.getObjectDistance());
                     sendLogMessage("Detected enemy at " + enemyPosition);
-                    broadcast("type:enemyPosition;x:" + enemyPosition.getX() +  ";y:" + enemyPosition.getY()
+                    broadcast("type:enemyPosition;x:" + enemyPosition.getX() + ";y:" + enemyPosition.getY()
                             + ";by:" + whoAmI + ";direction:" + r.getObjectDirection());
                 }
                 break;
             }
         }
+    }
+    
+    private ArrayList<Coordonnate> findPath(Coordonnate coord) {
+        Coordonnate upLeft = new Coordonnate(400, 400);
+        Coordonnate underUpLeft = new Coordonnate(400, 1400);
+        Coordonnate righterUpLeft = new Coordonnate(2600, 400);
+        Coordonnate downRight = new Coordonnate(2600, 1400);
+        ArrayList<Coordonnate> res = new ArrayList<>();
+
+        res.addAll(PathFinder.findPath(coord, underUpLeft, obstaclesList));
+        res.addAll(PathFinder.findPath(underUpLeft, upLeft, obstaclesList));
+        res.addAll(PathFinder.findPath(upLeft, righterUpLeft, obstaclesList));
+        res.addAll(PathFinder.findPath(righterUpLeft, downRight, obstaclesList));
+        return res;
     }
 
     private void processAlliesMessages(){
@@ -112,17 +140,26 @@ public class ZorroBot  extends Brain{
         ArrayList<String> allMessagesFromAllies = new ArrayList<>();
         if (!messages.isEmpty())
             allMessagesFromAllies.addAll(messages);
-        if (!allMessagesFromAllies.isEmpty()) {
-            String msg = allMessagesFromAllies.remove(0);
-            HashMap<String, String> messageMap = decomposeMessage(msg);
-            if (!messageMap.get("by").equals(whoAmI.toString())) {
-                sendLogMessage("Received: " + "by: " + messageMap.get("by") + " for " + messageMap.get("type") + " at "
-                        + new Coordonnate(Double.parseDouble(messageMap.get("x")), Double.parseDouble(messageMap.get("y"))));
-                if (!messageMap.get("by").equals(whoAmI.toString()) && "wreck".equals(messageMap.get("type"))) {
-                    addObstacle(new Coordonnate(Double.parseDouble(messageMap.get("x")),
-                            Double.parseDouble(messageMap.get("y"))));
+        for (String msg : allMessagesFromAllies) {
+                HashMap<String, String> messageMap = decomposeMessage(msg);
+                if (!messageMap.get("by").equals(whoAmI.toString())) {
+                    sendLogMessage(
+                            "Received: " + "by: " + messageMap.get("by") + " for " + messageMap.get("type") + " at "
+                                    + new Coordonnate(Double.parseDouble(messageMap.get("x")),
+                                            Double.parseDouble(messageMap.get("y"))));
+                    if ("wreck".equals(messageMap.get("type"))) {
+                        addObstacle(new Coordonnate(Double.parseDouble(messageMap.get("x")),
+                                Double.parseDouble(messageMap.get("y"))));
+                    }
+                    if (whoAmI == botName.ZORRO1 && "youCanStartZorro1".equals(messageMap.get("type"))) {
+                        sendLogMessage(msg);
+                        goToTheOtherSideOnDeparture = true;
+                    }
+                    if (whoAmI == botName.ZORRO2 && "youCanStartZorro2".equals(messageMap.get("type"))) {
+                        sendLogMessage(msg);
+                        goToTheOtherSideOnDeparture = true;
+                    }
                 }
-            }
         }
     }
 
@@ -252,18 +289,10 @@ public class ZorroBot  extends Brain{
     public void takePlaceForDeparture() {
         switch (whoAmI) {
             case ZORRO1:
-                if (botSide == SIDE.LEFT) {
-                    targetObjective = new Coordonnate(Parameters.teamASecondaryBot1InitX, 600);
-                } else {
-                    targetObjective = new Coordonnate(Parameters.teamBSecondaryBot1InitX, 600);
-                }
+                targetObjective = new Coordonnate(botSide == SIDE.LEFT ? 400 : 2600, 650);
                 break;
             case ZORRO2:
-                if (botSide == SIDE.LEFT) {
-                    targetObjective = new Coordonnate(Parameters.teamASecondaryBot2InitX, 1500);
-                } else {
-                    targetObjective = new Coordonnate(Parameters.teamBSecondaryBot2InitX, 1500);
-                }
+                targetObjective = new Coordonnate(botSide == SIDE.LEFT ? 400 : 2600, 1450);
                 break;
             default:
                 break;
@@ -271,12 +300,12 @@ public class ZorroBot  extends Brain{
     }
 
     public void goToTheOtherSide() {
-        int destinationX = myPosition.getX() < 1400 ? 2800 : 200;
+        int destinationX = botSide == SIDE.LEFT ? 2600 : 400;
 
         if (whoAmI == botName.ZORRO1) {
-            pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX, 600), obstaclesList);
+            pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX, 500), obstaclesList);
         } else if (whoAmI == botName.ZORRO2) {
-            pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX, 1600), obstaclesList);
+            pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX, 1500), obstaclesList);
         }
     }
 
