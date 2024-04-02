@@ -8,7 +8,7 @@ import characteristics.IRadarResult;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-public class ZorroBot  extends Brain{
+public class HyperHerosSecondary  extends Brain{
 
     boolean runThereIsDanger = false;
 
@@ -28,7 +28,7 @@ public class ZorroBot  extends Brain{
         WAITINGTOGO, GOING
     }
 
-    public ZorroBot() {
+    public HyperHerosSecondary() {
         super();
     }
 
@@ -96,10 +96,8 @@ public class ZorroBot  extends Brain{
                 Coordonnate wreckPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
                         r.getObjectDistance());
                 if (addObstacle(wreckPosition)) {
-                    goToTheOtherSide();
                     broadcast("type:wreck;x:" + wreckPosition.getX() + ";y:" + wreckPosition.getY()
                             + ";by:" + whoAmI);
-
                 }
             }
             if (r.getObjectType() == IRadarResult.Types.BULLET
@@ -114,7 +112,7 @@ public class ZorroBot  extends Brain{
                             r.getObjectDistance());
                     sendLogMessage("Detected enemy at " + enemyPosition);
                     broadcast("type:enemyPosition;x:" + enemyPosition.getX() + ";y:" + enemyPosition.getY()
-                            + ";by:" + whoAmI + ";direction:" + r.getObjectDirection());
+                            + ";by:" + whoAmI + ";direction:" + r.getObjectDirection() + ";enemyType:"+ r.getObjectType().toString());
                 }
                 break;
             }
@@ -283,6 +281,7 @@ public class ZorroBot  extends Brain{
                 return false;
         }
         obstaclesList.add(pos);
+        goToTheOtherSide();
         return true;
     }
 

@@ -4,6 +4,7 @@ import characteristics.Parameters;
 import robotsimulator.Brain;
 import characteristics.IRadarResult;
 
+import java.sql.Time;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -11,7 +12,7 @@ class RobotMessage {
     String type;
     double x, y;
     String by;
-    double treatedTime;
+    String enemyType;
 
     public RobotMessage(String type, double x, double y, String by) {
         this.type = type;
@@ -19,22 +20,18 @@ class RobotMessage {
         this.y = y;
         this.by = by;
     }
-
-    public void isTreated() {
-        treatedTime = System.currentTimeMillis();
+    public RobotMessage(String type, double x, double y, String by, String enemyType) {
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        this.by = by;
+        this.enemyType = enemyType;
     }
 
-    public boolean isEquals(RobotMessage message) {
-        if (type.equals("enemyPosition") && message.type.equals("enemyPosition")) {
-            return x == message.x && y == message.y && System.currentTimeMillis() - treatedTime < 2000;
-        }
-        return x == message.x && y == message.y && type.equals(message.type);
-    }
     
 }
 
-public class BatmanBot extends Brain {
-
+public class HyperHerosMain extends Brain {
 
     private double enemyDirection = 0;
     private STATE currentState;
@@ -56,7 +53,7 @@ public class BatmanBot extends Brain {
         WAITINGTOGO, GOING
     }
 
-    public BatmanBot() {
+    public HyperHerosMain() {
         super();
     }
 
@@ -153,13 +150,55 @@ public class BatmanBot extends Brain {
 
         for (Coordonnate target : targets) {
             double angle = CoordinateTransform.convertCartesianToPolar(myPosition, target).getAngle();
-            if (isRoughlySameDirection(angle, enemyDirection)) {
+            if (isLineOfSightClear(myPosition, enemyPosition)) {
                 sendLogMessage("Can't fire enemy at"+ enemyDirection );
                 currentState = STATE.MOVESTATE;
                 return false;
             }
         }
         return true;
+    }
+
+    private boolean isLineOfSightClear(Coordonnate from, Coordonnate to) {
+        for (Coordonnate obstacle : obstaclesList) {
+            if (doesRayIntersectCircle(from, to, obstacle, Parameters.teamAMainBotRadius)) {
+                return false; // Obstacle trouvé sur le chemin
+            }
+        }
+
+        // Vérifiez également les autres robots comme obstacles
+        for (Coordonnate otherRobotPosition : allBotsPositions.values()) {
+            if (!otherRobotPosition.equals(myPosition) && // Ne pas vérifier avec sa propre position
+                    doesRayIntersectCircle(from, to, otherRobotPosition, Parameters.teamAMainBotRadius)) {
+                return false; // Un autre robot trouvé sur le chemin
+            }
+        }
+
+        return true; // Aucun obstacle trouvé, le chemin est clair
+    }
+
+    private boolean doesRayIntersectCircle(Coordonnate rayStart, Coordonnate rayEnd, Coordonnate circleCenter,
+            double circleRadius) {
+        double rayLength = rayStart.distance(rayEnd);
+        double dx = (rayEnd.getX() - rayStart.getX()) / rayLength; // Direction normalisée
+        double dy = (rayEnd.getY() - rayStart.getY()) / rayLength; // Direction normalisée
+
+        // Vector from ray start to circle center
+        double fX = circleCenter.getX() - rayStart.getX();
+        double fY = circleCenter.getY() - rayStart.getY();
+
+        // Project f onto ray direction
+        double t = fX * dx + fY * dy;
+
+        // Find the closest point on the ray to the circle center
+        double closestX = rayStart.getX() + dx * t;
+        double closestY = rayStart.getY() + dy * t;
+        Coordonnate closestPoint = new Coordonnate(closestX, closestY);
+
+        // Distance from closest point to circle center
+        double distanceToCenter = closestPoint.distance(circleCenter);
+
+        return distanceToCenter < circleRadius;
     }
 
     private Coordonnate predictFuturePosition(Coordonnate currentPosition, double direction, int speed) {
@@ -169,30 +208,30 @@ public class BatmanBot extends Brain {
         return new Coordonnate(futureX, futureY);
     }
     
-    private boolean isLineOfSightClear(Coordonnate from, Coordonnate to) {
-        // Distance totale à parcourir
-        double totalDistance = from.distance(to);
-        double dx = to.getX() - from.getX();
-        double dy = to.getY() - from.getY();
+    // private boolean isLineOfSightClear(Coordonnate from, Coordonnate to) {
+    //     // Distance totale à parcourir
+    //     double totalDistance = from.distance(to);
+    //     double dx = to.getX() - from.getX();
+    //     double dy = to.getY() - from.getY();
 
-        // Nombre de vérifications basé sur la distance entre les points
-        int steps = (int) (totalDistance / 10); // Choisissez un pas de vérification approprié
+    //     // Nombre de vérifications basé sur la distance entre les points
+    //     int steps = (int) (totalDistance / 10); // Choisissez un pas de vérification approprié
 
-        // Vérifier chaque point le long de la ligne pour les obstacles
-        for (int i = 1; i <= steps; i++) {
-            double progressRatio = (double) i / steps;
+    //     // Vérifier chaque point le long de la ligne pour les obstacles
+    //     for (int i = 1; i <= steps; i++) {
+    //         double progressRatio = (double) i / steps;
 
-            // Calculer la position intermédiaire
-            double checkX = from.getX() + dx * progressRatio;
-            double checkY = from.getY() + dy * progressRatio;
+    //         // Calculer la position intermédiaire
+    //         double checkX = from.getX() + dx * progressRatio;
+    //         double checkY = from.getY() + dy * progressRatio;
 
-            // Vérifier si cette position intermédiaire touche un obstacle
-            if (touchesObstacle(new Coordonnate(checkX, checkY))) {
-                return false; // La ligne de vue est bloquée
-            }
-        }
-        return true; // La ligne de vue est claire
-    }
+    //         // Vérifier si cette position intermédiaire touche un obstacle
+    //         if (touchesObstacle(new Coordonnate(checkX, checkY))) {
+    //             return false; // La ligne de vue est bloquée
+    //         }
+    //     }
+    //     return true; // La ligne de vue est claire
+    // }
 
     private boolean touchesObstacle(Coordonnate position) {
         for (Coordonnate obstacle : obstaclesList) {
@@ -209,12 +248,24 @@ public class BatmanBot extends Brain {
         ArrayList<String> rawMessages = fetchAllMessages();
         for (String msg : rawMessages) {
             HashMap<String, String> messageMap = decomposeMessage(msg);
-            RobotMessage robotMessage = new RobotMessage(messageMap.get("type"),
-                    Double.parseDouble(messageMap.get("x")),
-                    Double.parseDouble(messageMap.get("y")),
-                    messageMap.get("by"));
-            if (!robotMessage.by.equals(whoAmI.toString())) {
-                messageQueue.add(robotMessage);
+            if (messageMap.get("enemyType") != null) {
+                RobotMessage robotMessage = new RobotMessage(messageMap.get("type"),
+                        Double.parseDouble(messageMap.get("x")),
+                        Double.parseDouble(messageMap.get("y")),
+                        messageMap.get("by"),
+                        messageMap.get("enemyType"));
+                if (!robotMessage.by.equals(whoAmI.toString())) {
+                    messageQueue.add(robotMessage);
+                }
+            }
+            else {
+                RobotMessage robotMessage = new RobotMessage(messageMap.get("type"),
+                        Double.parseDouble(messageMap.get("x")),
+                        Double.parseDouble(messageMap.get("y")),
+                        messageMap.get("by"));
+                if (!robotMessage.by.equals(whoAmI.toString())) {
+                    messageQueue.add(robotMessage);
+                }
             }
         }
         for (RobotMessage message : messageQueue) {
@@ -240,7 +291,7 @@ public class BatmanBot extends Brain {
 
     private void processEnnemyDetectedMessages(ArrayList<RobotMessage> messageQueue) {
         if (!messageQueue.isEmpty()) {
-            RobotMessage message = messageQueue.remove(0);
+            RobotMessage message = getClosestOpponentMessage(messageQueue);
             sendLogMessage(
                     "by: " + message.by + " for " + message.type + " at " + new Coordonnate(message.x, message.y));
             if (!message.by.equals(whoAmI.toString())) {
@@ -262,7 +313,7 @@ public class BatmanBot extends Brain {
     }
 
     public void goToTheOtherSide() {
-        int destinationX = botSide == SIDE.LEFT ? 2900 : 100;
+        int destinationX = botSide == SIDE.LEFT ? 2800 : 200;
 
         if (whoAmI == botName.BATTMAN1) {
             pathToFollow = PathFinder.findPath(myPosition, new Coordonnate(destinationX,
@@ -302,7 +353,7 @@ public class BatmanBot extends Brain {
                 enemyPosition = getPositionByDirectionAndDistance(myPosition, r.getObjectDirection(),
                         r.getObjectDistance());
                 broadcast("type:enemyPosition;x:" + enemyPosition.getX() + ";y:" + enemyPosition.getY() + ";by:"
-                        + whoAmI);
+                        + whoAmI+";enemyType:"+ r.getObjectType().toString());
                 sendLogMessage("I see an enemy at " + enemyPosition);
                 if (canFireEnemy()) {
                     currentState = STATE.FIRESTATE;
@@ -314,9 +365,6 @@ public class BatmanBot extends Brain {
                         r.getObjectDistance());
                 
                 if (addObstacle(wreckPosition)) {
-                    if(isSameDirection(r.getObjectDirection())) {
-                        goToTheOtherSide();
-                    }
                     broadcast("type:wreck;x:" + wreckPosition.getX() + ";y:" + wreckPosition.getY() + ";by:"
                         + whoAmI);
                 }
@@ -478,6 +526,7 @@ public class BatmanBot extends Brain {
                 return false;
         }
         obstaclesList.add(pos);
+        goToTheOtherSide();
         return true;
     }
 
@@ -520,7 +569,18 @@ public class BatmanBot extends Brain {
         RobotMessage closestOpponent = null;
         double minDistance = Double.MAX_VALUE;
         for (RobotMessage m : messages) {
-            if (m.type.equals("enemyPosition")) {
+            if (m.type.equals("enemyPosition") && m.enemyType.equals("OpponentMainBot")) {
+                Coordonnate enemyPos = new Coordonnate(m.x, m.y);
+                if (myPosition.distance(enemyPos) < minDistance) {
+                    minDistance = myPosition.distance(enemyPos);
+                    closestOpponent = m;
+                }
+            }
+        }
+        messages.removeIf(message -> message.enemyType.equals("OpponentMainBot"));
+        minDistance = Double.MAX_VALUE;
+        for (RobotMessage m : messages) {
+            if (m.type.equals("enemyPosition") && m.enemyType.equals("OpponentSecondaryBot")) {
                 Coordonnate enemyPos = new Coordonnate(m.x, m.y);
                 if (myPosition.distance(enemyPos) < minDistance) {
                     minDistance = myPosition.distance(enemyPos);
